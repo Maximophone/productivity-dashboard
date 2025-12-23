@@ -309,20 +309,34 @@ function App() {
                     </div>
                 </div>
                 <div>
-                    <h2>Mindfulness & Meditation</h2>
-                    <div className="card" style={{ height: '350px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <ComposedChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
-                                <YAxis yAxisId="left" stroke="#2dd4bf" label={{ value: 'Moments', angle: -90, position: 'insideLeft' }} />
-                                <YAxis yAxisId="right" orientation="right" stroke="#0d9488" label={{ value: 'Minutes', angle: 90, position: 'insideRight' }} />
-                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                <Legend />
-                                <Bar yAxisId="left" dataKey="mindfulness_moments" name="Moments Logged" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
-                                <Bar yAxisId="right" dataKey="meditation_time" name="Meditation (min)" fill="#0d9488" radius={[4, 4, 0, 0]} />
-                            </ComposedChart>
-                        </ResponsiveContainer>
+                    <h2>Mindfulness & Meditation (Stacked Lanes)</h2>
+                    <div className="card" style={{ height: '350px', display: 'flex', flexDirection: 'column', gap: '0', padding: '1rem 0' }}>
+                        {/* Moments Lane */}
+                        <div style={{ height: '50%', position: 'relative' }}>
+                            <div style={{ position: 'absolute', top: '0', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MOMENTS LOGGED</div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="date" hide />
+                                    <YAxis hide />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                    <Bar dataKey="mindfulness_moments" name="Moments" fill="#2dd4bf" radius={[2, 2, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {/* Meditation Minutes Lane */}
+                        <div style={{ height: '50%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MEDITATION (MINUTES)</div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 9 }} />
+                                    <YAxis hide />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                    <Bar dataKey="meditation_time" name="Minutes" fill="#0d9488" radius={[2, 2, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
             </div>
