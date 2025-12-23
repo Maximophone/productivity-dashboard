@@ -40,8 +40,8 @@ async function processDailyNotes() {
                     INSERT INTO daily_metrics (
                         date, start_time, work_hours, procrastination_minutes, dispersion_minutes,
                         total_hours, mindfulness_moments, meditation_time, meditation_quality,
-                        sleep_quality, mood_score, mood_sentiment, textual_info
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        sleep_quality, mood_score, mood_sentiment, textual_info, is_workday
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `);
 
                 insert.run(
@@ -57,7 +57,8 @@ async function processDailyNotes() {
                     metrics.sleep_quality || 0,
                     metrics.mood_score || 0,
                     metrics.mood_sentiment || '',
-                    JSON.stringify(metrics.textual_info || {})
+                    JSON.stringify(metrics.textual_info || {}),
+                    metrics.is_workday === false ? 0 : 1
                 );
                 console.log(`Saved metrics for ${date}`);
             }

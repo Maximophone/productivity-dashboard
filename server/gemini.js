@@ -28,6 +28,7 @@ async function extractDailyMetrics(content, date) {
     - sleep_quality: number (scale 1-5 or 1-10, normalize to 1-10)
     - mood_sentiment: string ("Positive", "Neutral", "Negative")
     - mood_score: number (Sentiment score 1-10)
+    - is_workday: boolean (True if this is a standard workday with work targets/start planning. False if it's a weekend, holiday, or day explicitly mentioned as off where no work was intended.)
     - textual_info: JSON object containing relevant text snippets like "radioactive_tasks", "most_important_task", "wins", "blockers".
 
     Content:

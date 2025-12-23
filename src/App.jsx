@@ -20,8 +20,8 @@ function App() {
             const mData = await mRes.json();
             const pData = await pRes.json();
 
-            // Reverse for chronological order in charts
-            const cronMetrics = [...mData].reverse();
+            // Reverse for chronological order in charts and filter for workdays
+            const cronMetrics = [...mData].reverse().filter(m => m.is_workday !== 0);
 
             // Process daily data with rolling average and unit conversion
             const processedDaily = cronMetrics.map((day, index) => {
