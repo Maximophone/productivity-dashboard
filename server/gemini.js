@@ -29,7 +29,12 @@ async function extractDailyMetrics(content, date) {
     - mood_sentiment: string ("Positive", "Neutral", "Negative")
     - mood_score: number (Sentiment score 1-10)
     - is_workday: boolean (True if this is a standard workday with work targets/start planning. False if it's a weekend, holiday, or day explicitly mentioned as off where no work was intended.)
-    - textual_info: JSON object containing relevant text snippets like "radioactive_tasks", "most_important_task", "wins", "blockers".
+    - textual_info: JSON object containing:
+      - most_important_task: string (The top priority task for the day)
+      - wins: string array (Specific achievements or completed tasks)
+      - blockers: string array (Distractions, illness, or inhibitors)
+      - summary: string (1-2 sentences summarizing the overall day, focus, or EOD writeup)
+      - radioactive_tasks: string array (Tasks causing stress or avoidance)
 
     Content:
     ${content}

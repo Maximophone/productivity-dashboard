@@ -196,13 +196,60 @@ function App() {
                         <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
                         <YAxis stroke="var(--text-secondary)" label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
                         <Tooltip
-                            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
-                            labelStyle={{ color: '#fff' }}
-                            formatter={(value, name) => {
-                                if (name.includes('avg') || name.includes('hours') || name === 'Productive' || name === 'Dispersion' || name === 'Procrastination') {
-                                    return [formatDuration(value), name];
+                            content={({ active, payload, label }) => {
+                                if (active && payload && payload.length) {
+                                    const data = payload[0].payload;
+                                    const info = typeof data.textual_info === 'string' ? JSON.parse(data.textual_info) : data.textual_info;
+
+                                    return (
+                                        <div className="custom-tooltip" style={{
+                                            backgroundColor: '#1e293b',
+                                            padding: '1rem',
+                                            borderRadius: '12px',
+                                            border: '1px solid rgba(255,255,255,0.1)',
+                                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)',
+                                            maxWidth: '300px'
+                                        }}>
+                                            <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: '#fff' }}>{label}</p>
+
+                                            {/* Metrics */}
+                                            <div style={{ marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                                {payload.map((entry, idx) => (
+                                                    <div key={idx} style={{ color: entry.color, fontSize: '0.9rem', marginBottom: '2px' }}>
+                                                        {entry.name}: {formatDuration(entry.value)}
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* Qualitative Context */}
+                                            {info && (
+                                                <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)' }}>
+                                                    {info.most_important_task && (
+                                                        <div style={{ marginBottom: '0.5rem' }}>
+                                                            <strong style={{ color: 'var(--accent-color)' }}>MIT:</strong> {info.most_important_task}
+                                                        </div>
+                                                    )}
+                                                    {info.summary && (
+                                                        <div style={{ marginBottom: '0.5rem', fontStyle: 'italic', borderLeft: '2px solid var(--accent-color)', paddingLeft: '8px' }}>
+                                                            {info.summary}
+                                                        </div>
+                                                    )}
+                                                    {(info.wins && info.wins.length > 0) && (
+                                                        <div style={{ marginBottom: '0.5rem' }}>
+                                                            <strong style={{ color: '#4ade80' }}>Wins:</strong> {info.wins[0]}{info.wins.length > 1 ? ` (+${info.wins.length - 1} more)` : ''}
+                                                        </div>
+                                                    )}
+                                                    {(info.blockers && info.blockers.length > 0) && (
+                                                        <div style={{ marginBottom: '0.5rem' }}>
+                                                            <strong style={{ color: '#f87171' }}>Blockers:</strong> {info.blockers[0]}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
                                 }
-                                return [value, name];
+                                return null;
                             }}
                         />
                         <Legend />
