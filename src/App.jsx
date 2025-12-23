@@ -9,6 +9,7 @@ function App() {
     const [procrastination, setProcrastination] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'weekly'
 
     const fetchData = async () => {
         try {
@@ -19,8 +20,24 @@ function App() {
             const mData = await mRes.json();
             const pData = await pRes.json();
 
-            // Sort metrics by date ascending for charts
-            setMetrics([...mData].reverse());
+            // Reverse for chronological order in charts
+            const cronMetrics = [...mData].reverse();
+
+            // Process daily data with rolling average and unit conversion
+            const processedDaily = cronMetrics.map((day, index) => {
+                const window = 7;
+                const slice = cronMetrics.slice(Math.max(0, index - window + 1), index + 1);
+                const avg = slice.reduce((acc, curr) => acc + (curr.work_hours || 0), 0) / slice.length;
+
+                return {
+                    ...day,
+                    procrastination_hours: (day.procrastination_minutes || 0) / 60,
+                    dispersion_hours: (day.dispersion_minutes || 0) / 60,
+                    work_hours_rolling: avg
+                };
+            });
+
+            setMetrics(processedDaily);
             setProcrastination(pData);
             setLoading(false);
         } catch (error) {
@@ -33,15 +50,56 @@ function App() {
         fetchData();
     }, []);
 
+    const getWeeklyData = (dailyData) => {
+        const weeks = {};
+        dailyData.forEach(day => {
+            const date = new Date(day.date);
+            const jan1 = new Date(date.getFullYear(), 0, 1);
+            const weekNum = Math.ceil((((date - jan1) / 86400000) + jan1.getDay() + 1) / 7);
+            const weekKey = `${date.getFullYear()}-W${weekNum}`;
+
+            if (!weeks[weekKey]) {
+                weeks[weekKey] = {
+                    date: weekKey,
+                    work_hours: 0,
+                    procrastination_hours: 0,
+                    dispersion_hours: 0,
+                    total_hours: 0,
+                    mindfulness_moments: 0,
+                    meditation_time: 0,
+                    sleep_quality: 0,
+                    mood_score: 0,
+                    count: 0
+                };
+            }
+            weeks[weekKey].work_hours += day.work_hours || 0;
+            weeks[weekKey].procrastination_hours += day.procrastination_hours || 0;
+            weeks[weekKey].dispersion_hours += day.dispersion_hours || 0;
+            weeks[weekKey].total_hours += day.total_hours || 0;
+            weeks[weekKey].mindfulness_moments += day.mindfulness_moments || 0;
+            weeks[weekKey].meditation_time += day.meditation_time || 0;
+            weeks[weekKey].sleep_quality += day.sleep_quality || 0;
+            weeks[weekKey].mood_score += day.mood_score || 0;
+            weeks[weekKey].count += 1;
+        });
+
+        return Object.values(weeks).map(w => ({
+            ...w,
+            sleep_quality: w.sleep_quality / w.count,
+            mood_score: w.mood_score / w.count
+        }));
+    };
+
+    const chartData = viewMode === 'daily' ? metrics : getWeeklyData(metrics);
+
     const handleRefresh = async () => {
         setRefreshing(true);
         try {
             await fetch('/api/refresh', { method: 'POST' });
-            // Poll for updates or just wait a bit (basic implementation)
             setTimeout(() => {
                 fetchData();
                 setRefreshing(false);
-            }, 5000); // Wait 5s then reload data
+            }, 5000);
         } catch (e) {
             console.error(e);
             setRefreshing(false);
@@ -59,9 +117,29 @@ function App() {
                     <h1>Productivity Dashboard</h1>
                     <p style={{ color: 'var(--text-secondary)' }}>Tracking daily habits and focus from Obsidian</p>
                 </div>
-                <button onClick={handleRefresh} disabled={refreshing}>
-                    {refreshing ? 'Syncing...' : 'Sync Notes'}
-                </button>
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div className="toggle-group" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '4px' }}>
+                        <button
+                            onClick={() => setViewMode('daily')}
+                            style={{
+                                background: viewMode === 'daily' ? 'var(--accent-color)' : 'transparent',
+                                color: viewMode === 'daily' ? 'white' : 'var(--text-secondary)',
+                                padding: '6px 12px'
+                            }}
+                        >Daily</button>
+                        <button
+                            onClick={() => setViewMode('weekly')}
+                            style={{
+                                background: viewMode === 'weekly' ? 'var(--accent-color)' : 'transparent',
+                                color: viewMode === 'weekly' ? 'white' : 'var(--text-secondary)',
+                                padding: '6px 12px'
+                            }}
+                        >Weekly</button>
+                    </div>
+                    <button onClick={handleRefresh} disabled={refreshing}>
+                        {refreshing ? 'Syncing...' : 'Sync Notes'}
+                    </button>
+                </div>
             </header>
 
             {/* KPI Cards */}
@@ -74,7 +152,7 @@ function App() {
                     </div>
                 </div>
                 <div className="card">
-                    <div className="stat-label">Destractions (Last)</div>
+                    <div className="stat-label">Distractions (Last)</div>
                     <div className="stat-value">
                         {((latest.procrastination_minutes || 0) + (latest.dispersion_minutes || 0))}m
                     </div>
@@ -101,56 +179,57 @@ function App() {
             </section>
 
             {/* Charts */}
-            <h2>Productivity Trends</h2>
+            <h2>Time Utilization {viewMode === 'weekly' ? '(Weekly Aggregated)' : ''}</h2>
             <div className="card" style={{ height: '400px' }}>
                 <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={metrics}>
+                    <ComposedChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 12 }} />
-                        <YAxis yAxisId="left" stroke="var(--text-secondary)" label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-                        <YAxis yAxisId="right" orientation="right" stroke="var(--text-secondary)" label={{ value: 'Minutes', angle: 90, position: 'insideRight' }} />
+                        <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
+                        <YAxis stroke="var(--text-secondary)" label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
                         <Tooltip
                             contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
                             labelStyle={{ color: '#fff' }}
                         />
                         <Legend />
-                        <Bar yAxisId="left" dataKey="work_hours" NAME="Work Hours" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-                        <Line yAxisId="right" type="monotone" dataKey="procrastination_minutes" name="Procrastination (m)" stroke="#f87171" strokeWidth={2} />
-                        <Line yAxisId="right" type="monotone" dataKey="dispersion_minutes" name="Dispersion (m)" stroke="#facc15" strokeWidth={2} />
+                        <Bar stackId="a" dataKey="work_hours" name="Productive" fill="#38bdf8" radius={viewMode === 'weekly' ? [0, 0, 0, 0] : [0, 0, 0, 0]} />
+                        <Bar stackId="a" dataKey="dispersion_hours" name="Dispersion" fill="#facc15" />
+                        <Bar stackId="a" dataKey="procrastination_hours" name="Procrastination" fill="#f87171" radius={[4, 4, 0, 0]} />
+                        {viewMode === 'daily' && (
+                            <Line type="monotone" dataKey="work_hours_rolling" name="7d avg (Productive)" stroke="#4ade80" strokeWidth={3} dot={false} />
+                        )}
                     </ComposedChart>
                 </ResponsiveContainer>
             </div>
 
             <div className="grid">
                 <div>
-                    <h2>Wellbeing</h2>
+                    <h2>Wellbeing Trends</h2>
                     <div className="card" style={{ height: '300px' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={metrics}>
+                            <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                <XAxis dataKey="date" stroke="var(--text-secondary)" />
+                                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
                                 <YAxis domain={[0, 10]} stroke="var(--text-secondary)" />
-                                <Tooltip />
+                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
                                 <Legend />
-                                <Line type="monotone" dataKey="sleep_quality" name="Sleep" stroke="#818cf8" strokeWidth={2} />
-                                <Line type="monotone" dataKey="mood_score" name="Mood" stroke="#c084fc" strokeWidth={2} />
-                                <Line type="monotone" dataKey="meditation_quality" name="Meditation Q" stroke="#4ade80" strokeWidth={2} />
-                            </LineChart>
+                                <Bar dataKey="sleep_quality" name="Sleep" fill="#818cf8" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="mood_score" name="Mood" fill="#c084fc" radius={[4, 4, 0, 0]} />
+                            </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
                 <div>
-                    <h2>Mindfulness</h2>
+                    <h2>Mindfulness & Meditation</h2>
                     <div className="card" style={{ height: '300px' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={metrics}>
+                            <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                <XAxis dataKey="date" stroke="var(--text-secondary)" />
+                                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
                                 <YAxis stroke="var(--text-secondary)" />
-                                <Tooltip />
+                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
                                 <Legend />
                                 <Bar dataKey="mindfulness_moments" name="Moments Logged" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="meditation_time" name="Duration (min)" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="meditation_time" name="Meditation (min)" fill="#0d9488" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -168,7 +247,7 @@ function App() {
                             <th>Duration</th>
                             <th>Activity</th>
                             <th>Trigger</th>
-                            <th>Reason/Feeling</th>
+                            <th>Feeling</th>
                         </tr>
                     </thead>
                     <tbody>
