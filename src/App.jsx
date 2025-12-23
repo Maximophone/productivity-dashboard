@@ -265,20 +265,47 @@ function App() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                 <div>
-                    <h2>Wellbeing Trends</h2>
-                    <div className="card" style={{ height: '350px' }}>
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
-                                <YAxis domain={[0, 10]} stroke="var(--text-secondary)" />
-                                <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                <Legend />
-                                <Bar dataKey="sleep_quality" name="Sleep" fill="#818cf8" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="mood_score" name="Mood" fill="#c084fc" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="meditation_quality" name="Meditation Quality" fill="#4ade80" radius={[4, 4, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    <h2>Wellbeing Trends (Stacked Lanes)</h2>
+                    <div className="card" style={{ height: '500px', display: 'flex', flexDirection: 'column', gap: '0', padding: '1rem 0' }}>
+                        {/* Mood Lane */}
+                        <div style={{ height: '33.3%', position: 'relative' }}>
+                            <div style={{ position: 'absolute', top: '0', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MOOD</div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="date" hide />
+                                    <YAxis domain={[0, 10]} hide />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                    <Bar dataKey="mood_score" name="Mood" fill="#c084fc" radius={[2, 2, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {/* Sleep Lane */}
+                        <div style={{ height: '33.3%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>SLEEP</div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="date" hide />
+                                    <YAxis domain={[0, 10]} hide />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                    <Bar dataKey="sleep_quality" name="Sleep" fill="#818cf8" radius={[2, 2, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                        {/* Meditation Lane */}
+                        <div style={{ height: '33.3%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MEDITATION QUALITY</div>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 9 }} />
+                                    <YAxis domain={[0, 5]} hide />
+                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                    <Bar dataKey="meditation_quality" name="Meditation Quality" fill="#4ade80" radius={[2, 2, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
                 </div>
                 <div>
