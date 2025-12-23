@@ -201,10 +201,10 @@ function App() {
                 </ResponsiveContainer>
             </div>
 
-            <div className="grid">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                 <div>
                     <h2>Wellbeing Trends</h2>
-                    <div className="card" style={{ height: '300px' }}>
+                    <div className="card" style={{ height: '350px' }}>
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -214,23 +214,25 @@ function App() {
                                 <Legend />
                                 <Bar dataKey="sleep_quality" name="Sleep" fill="#818cf8" radius={[4, 4, 0, 0]} />
                                 <Bar dataKey="mood_score" name="Mood" fill="#c084fc" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="meditation_quality" name="Meditation Quality" fill="#4ade80" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
                 <div>
                     <h2>Mindfulness & Meditation</h2>
-                    <div className="card" style={{ height: '300px' }}>
+                    <div className="card" style={{ height: '350px' }}>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData}>
+                            <ComposedChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                                 <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
-                                <YAxis stroke="var(--text-secondary)" />
+                                <YAxis yAxisId="left" stroke="#2dd4bf" label={{ value: 'Moments', angle: -90, position: 'insideLeft' }} />
+                                <YAxis yAxisId="right" orientation="right" stroke="#0d9488" label={{ value: 'Minutes', angle: 90, position: 'insideRight' }} />
                                 <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
                                 <Legend />
-                                <Bar dataKey="mindfulness_moments" name="Moments Logged" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
-                                <Bar dataKey="meditation_time" name="Meditation (min)" fill="#0d9488" radius={[4, 4, 0, 0]} />
-                            </BarChart>
+                                <Bar yAxisId="left" dataKey="mindfulness_moments" name="Moments Logged" fill="#2dd4bf" radius={[4, 4, 0, 0]} />
+                                <Bar yAxisId="right" dataKey="meditation_time" name="Meditation (min)" fill="#0d9488" radius={[4, 4, 0, 0]} />
+                            </ComposedChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
