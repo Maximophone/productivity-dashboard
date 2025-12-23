@@ -11,6 +11,15 @@ function App() {
     const [refreshing, setRefreshing] = useState(false);
     const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'weekly'
 
+    const formatDuration = (decimalHours) => {
+        if (decimalHours === null || decimalHours === undefined || isNaN(decimalHours)) return '-';
+        const totalMinutes = Math.round(decimalHours * 60);
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        if (h > 0) return `${h}h${m > 0 ? m.toString().padStart(2, '0') + 'm' : ''}`;
+        return `${m}m`;
+    };
+
     const fetchData = async () => {
         try {
             const [mRes, pRes] = await Promise.all([
@@ -146,7 +155,7 @@ function App() {
             <section className="grid">
                 <div className="card">
                     <div className="stat-label">Work Hours (Last)</div>
-                    <div className="stat-value">{latest.work_hours?.toFixed(2) || '-'}</div>
+                    <div className="stat-value">{formatDuration(latest.work_hours)}</div>
                     <div style={{ fontSize: '0.8rem', color: latest.work_hours >= 6 ? 'var(--success-color)' : 'var(--warning-color)' }}>
                         Target: 6h+
                     </div>
@@ -189,6 +198,12 @@ function App() {
                         <Tooltip
                             contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
                             labelStyle={{ color: '#fff' }}
+                            formatter={(value, name) => {
+                                if (name.includes('avg') || name.includes('hours') || name === 'Productive' || name === 'Dispersion' || name === 'Procrastination') {
+                                    return [formatDuration(value), name];
+                                }
+                                return [value, name];
+                            }}
                         />
                         <Legend />
                         <Bar stackId="a" dataKey="work_hours" name="Productive" fill="#38bdf8" radius={viewMode === 'weekly' ? [0, 0, 0, 0] : [0, 0, 0, 0]} />
