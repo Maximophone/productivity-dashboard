@@ -24,10 +24,10 @@ async function extractDailyMetrics(content, date) {
     - dispersion_minutes: number
     - mindfulness_moments: number (Count of fulfilled mindfulness commitments/log entries)
     - meditation_time: number (minutes)
-    - meditation_quality: number (scale 1-5 usually, normalize if needed)
+    - meditation_quality: number (RAW score 1-5 ONLY if explicitly mentioned as "X/5" or "quality: X". DO NOT infer from adjectives like "great", "good", or "excellent". If no explicit number is given, return null.)
     - sleep_quality: number (scale 1-5 or 1-10, normalize to 1-10)
     - mood_sentiment: string ("Positive", "Neutral", "Negative")
-    - mood_score: number (Sentiment score 1-10)
+    - mood_score: number (Sentiment score 1-10 if explicitly mentioned, otherwise null)
     - is_workday: boolean (True if this is a standard workday with work targets/start planning. False if it's a weekend, holiday, or day explicitly mentioned as off where no work was intended.)
     - textual_info: JSON object containing:
       - most_important_task: string (The top priority task for the day)

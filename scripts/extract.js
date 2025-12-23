@@ -22,13 +22,15 @@ async function processDailyNotes() {
         .sort()
         .reverse();
 
+    const isFull = process.argv.includes('--full');
+
     // Get existing dates
-    const existing = db.prepare('SELECT date FROM daily_metrics').all().map(r => r.date);
+    const existing = isFull ? [] : db.prepare('SELECT date FROM daily_metrics').all().map(r => r.date);
 
     // Process new files
     for (const file of files) {
         const date = file.replace('.md', '');
-        if (existing.includes(date)) continue;
+        if (!isFull && existing.includes(date)) continue;
 
         console.log(`Processing ${date}...`);
         const content = fs.readFileSync(path.join(NOTES_PATH, file), 'utf-8');
@@ -37,7 +39,7 @@ async function processDailyNotes() {
             const metrics = await extractDailyMetrics(content, date);
             if (metrics) {
                 const insert = db.prepare(`
-                    INSERT INTO daily_metrics (
+                    INSERT OR REPLACE INTO daily_metrics (
                         date, start_time, work_hours, procrastination_minutes, dispersion_minutes,
                         total_hours, mindfulness_moments, meditation_time, meditation_quality,
                         sleep_quality, mood_score, mood_sentiment, textual_info, is_workday
@@ -47,15 +49,15 @@ async function processDailyNotes() {
                 insert.run(
                     date,
                     metrics.start_time || null,
-                    metrics.work_hours || 0,
-                    metrics.procrastination_minutes || 0,
-                    metrics.dispersion_minutes || 0,
-                    metrics.total_hours || 0,
-                    metrics.mindfulness_moments || 0,
-                    metrics.meditation_time || 0,
-                    metrics.meditation_quality || 0,
-                    metrics.sleep_quality || 0,
-                    metrics.mood_score || 0,
+                    metrics.work_hours ?? 0,
+                    metrics.procrastination_minutes ?? 0,
+                    metrics.dispersion_minutes ?? 0,
+                    metrics.total_hours ?? 0,
+                    metrics.mindfulness_moments ?? 0,
+                    metrics.meditation_time ?? null,
+                    metrics.meditation_quality ?? null,
+                    metrics.sleep_quality ?? null,
+                    metrics.mood_score ?? null,
                     metrics.mood_sentiment || '',
                     JSON.stringify(metrics.textual_info || {}),
                     metrics.is_workday === false ? 0 : 1
