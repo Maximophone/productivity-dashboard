@@ -9,9 +9,12 @@ async function extractDailyMetrics(content, date) {
     Analyze the following Obsidian daily note for date ${date}.
     Extract the following metrics in JSON format. 
     IMPORTANT: 
-    - Only log "procrastination_minutes" if they are explicitly mentioned or can be calculated from explicit durations of procrastination/dispersion activities. 
-    - DO NOT assume a late start time (e.g. starting the day at 3 PM) is procrastination unless the user explicitly labels that missing time as such. 
-    - If no explicit procrastination is mentioned, use 0.
+    - Only log "procrastination_minutes" or "dispersion_minutes" if they are EXPLICITLY mentioned in minutes/hours or can be calculated from explicit durations of specifically mentioned activities. 
+    - DO NOT assume or infer durations from qualitative phrases like "all day long", "most of the day", or "I procrastinated a lot".
+    - DO NOT calculate procrastination by looking at gaps between timestamps (e.g., if day starts at 9:00 and EOD is 18:00 and only 1h work is logged, DO NOT assume 8h of procrastination). 
+    - If no explicit duration is given for a procrastination/dispersion event, use 0 for that specific event.
+    - If a metric like "mood_score", "sleep_quality", or "meditation_time" is missing or blank in the note, return null (do not use 0).
+    - DO NOT assume a late start time is procrastination unless explicitly labeled.
 
     Metrics:
     - start_time: HH:MM (24h format)
