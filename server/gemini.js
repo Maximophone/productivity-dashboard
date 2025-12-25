@@ -13,7 +13,7 @@ async function extractDailyMetrics(content, date) {
     - DO NOT assume or infer durations from qualitative phrases like "all day long", "most of the day", or "I procrastinated a lot".
     - DO NOT calculate procrastination by looking at gaps between timestamps (e.g., if day starts at 9:00 and EOD is 18:00 and only 1h work is logged, DO NOT assume 8h of procrastination). 
     - If no explicit duration is given for a procrastination/dispersion event, use 0 for that specific event.
-    - If a metric like "mood_score", "sleep_quality", or "meditation_time" is missing or blank in the note, return null (do not use 0).
+    - If a metric is missing or blank in the note, return null (do not use 0).
     - DO NOT assume a late start time is procrastination unless explicitly labeled.
 
     Metrics:
@@ -22,13 +22,26 @@ async function extractDailyMetrics(content, date) {
     - total_hours: number (Gross hours before deductions)
     - procrastination_minutes: number
     - dispersion_minutes: number
-    - mindfulness_moments: number (Count of fulfilled mindfulness commitments/log entries)
-    - meditation_time: number (minutes)
-    - meditation_quality: number (RAW score 1-5 ONLY if explicitly mentioned as "X/5" or "quality: X". DO NOT infer from adjectives like "great", "good", or "excellent". If no explicit number is given, return null.)
-    - sleep_quality: number (scale 1-5 or 1-10, normalize to 1-10)
-    - mood_sentiment: string ("Positive", "Neutral", "Negative")
-    - mood_score: number (Sentiment score 1-10 if explicitly mentioned, otherwise null)
+    
+    - mindfulness_moments: number (Count SHORT mindfulness moments or quick meditations during the day. Look for:
+      1. Lines with timestamps followed by "mindfulness" or similar (e.g., "10:30 mindfulness", "14:00 - mindfulness moment")
+      2. Ticked checkboxes for meditation items inside "deep work mode" or "radioactive protocol" sections (e.g., "- [x] meditation")
+      DO NOT count the main morning meditation session here - only count brief mindfulness breaks throughout the day.
+      If no mindfulness moments are found, return 0.)
+    
+    - meditation_time: number (minutes of the MAIN meditation session, usually in the morning)
+    - meditation_quality: number (1-5 scale ONLY if explicitly mentioned as "X/5" or "quality: X". Return null if not explicit.)
+    - meditation_comment: string (Any user comment about their meditation experience, technique used, or quality. Return null if no comment.)
+    
+    - sleep_quality: number (1-5 scale. If given as X/10, divide by 2. Return null if not mentioned.)
+    - sleep_comment: string (Any user comment about their sleep, dreams, or rest quality. Return null if no comment.)
+    
+    - mood_sentiment: string ("Positive", "Neutral", or "Negative" - infer from overall tone of the day)
+    - mood_score: number (1-5 scale. Infer from the overall tone, EOD writeup, wins/blockers. 1=very negative, 3=neutral, 5=very positive. Always provide a score based on your analysis.)
+    - mood_comment: string (1-2 sentences explaining WHY you assigned this mood sentiment and score based on the note content)
+    
     - is_workday: boolean (True if this is a standard workday with work targets/start planning. False if it's a weekend, holiday, or day explicitly mentioned as off where no work was intended.)
+    
     - textual_info: JSON object containing:
       - most_important_task: string (The top priority task for the day)
       - wins: string array (Specific achievements or completed tasks)

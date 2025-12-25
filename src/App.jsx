@@ -643,9 +643,33 @@ function App() {
                                         <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                                             <XAxis dataKey="date" hide />
-                                            <YAxis domain={[0, 10]} hide />
-                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                            <Bar dataKey="mood_score" name="Mood" fill="#c084fc" radius={[2, 2, 0, 0]} />
+                                            <YAxis domain={[0, 5]} hide />
+                                            <Tooltip
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const d = payload[0].payload;
+                                                        return (
+                                                            <div style={{ backgroundColor: '#1e293b', padding: '10px', borderRadius: '6px', border: 'none', maxWidth: '300px' }}>
+                                                                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{d.date}</div>
+                                                                <div>Score: {d.mood_score ?? '-'}/5 • {d.mood_sentiment || '-'}</div>
+                                                                {d.mood_comment && <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '6px', fontStyle: 'italic' }}>{d.mood_comment}</div>}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Bar
+                                                dataKey="mood_score"
+                                                name="Mood"
+                                                radius={[2, 2, 0, 0]}
+                                                shape={(props) => {
+                                                    const { x, y, width, height, payload } = props;
+                                                    const sentiment = payload?.mood_sentiment;
+                                                    const fill = sentiment === 'Positive' ? '#4ade80' : sentiment === 'Negative' ? '#f87171' : '#fbbf24';
+                                                    return <rect x={x} y={y} width={width} height={height} fill={fill} rx={2} />;
+                                                }}
+                                            />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -656,8 +680,22 @@ function App() {
                                         <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                                             <XAxis dataKey="date" hide />
-                                            <YAxis domain={[0, 10]} hide />
-                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                            <YAxis domain={[0, 5]} hide />
+                                            <Tooltip
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const d = payload[0].payload;
+                                                        return (
+                                                            <div style={{ backgroundColor: '#1e293b', padding: '10px', borderRadius: '6px', border: 'none', maxWidth: '300px' }}>
+                                                                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{d.date}</div>
+                                                                <div>Sleep: {d.sleep_quality ?? '-'}/5</div>
+                                                                {d.sleep_comment && <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '6px', fontStyle: 'italic' }}>{d.sleep_comment}</div>}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
                                             <Bar dataKey="sleep_quality" name="Sleep" fill="#818cf8" radius={[2, 2, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
@@ -670,7 +708,21 @@ function App() {
                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                                             <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 9 }} />
                                             <YAxis domain={[0, 5]} hide />
-                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                            <Tooltip
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        const d = payload[0].payload;
+                                                        return (
+                                                            <div style={{ backgroundColor: '#1e293b', padding: '10px', borderRadius: '6px', border: 'none', maxWidth: '300px' }}>
+                                                                <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>{d.date}</div>
+                                                                <div>Quality: {d.meditation_quality ?? '-'}/5 • {d.meditation_time ?? 0}min</div>
+                                                                {d.meditation_comment && <div style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '6px', fontStyle: 'italic' }}>{d.meditation_comment}</div>}
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
                                             <Bar dataKey="meditation_quality" name="Meditation Quality" fill="#4ade80" radius={[2, 2, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>

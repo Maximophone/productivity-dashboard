@@ -8,9 +8,12 @@ CREATE TABLE IF NOT EXISTS daily_metrics (
   mindfulness_moments INTEGER,
   meditation_time INTEGER,
   meditation_quality REAL,
+  meditation_comment TEXT,
   sleep_quality REAL,
+  sleep_comment TEXT,
   mood_score REAL,
   mood_sentiment TEXT,
+  mood_comment TEXT,
   textual_info TEXT, -- Stored as JSON
   raw_ai_output TEXT, -- Raw JSON string from AI
   is_workday BOOLEAN DEFAULT 1,

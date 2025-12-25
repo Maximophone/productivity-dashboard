@@ -22,9 +22,10 @@ async function parseNote(date) {
         const insert = db.prepare(`
             INSERT OR REPLACE INTO daily_metrics (
                 date, start_time, work_hours, procrastination_minutes, dispersion_minutes,
-                total_hours, mindfulness_moments, meditation_time, meditation_quality,
-                sleep_quality, mood_score, mood_sentiment, textual_info, raw_ai_output, is_workday
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                total_hours, mindfulness_moments, meditation_time, meditation_quality, meditation_comment,
+                sleep_quality, sleep_comment, mood_score, mood_sentiment, mood_comment,
+                textual_info, raw_ai_output, is_workday
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `);
 
         insert.run(
@@ -37,9 +38,12 @@ async function parseNote(date) {
             metrics.mindfulness_moments ?? 0,
             metrics.meditation_time ?? null,
             metrics.meditation_quality ?? null,
+            metrics.meditation_comment || null,
             metrics.sleep_quality ?? null,
+            metrics.sleep_comment || null,
             metrics.mood_score ?? null,
             metrics.mood_sentiment || '',
+            metrics.mood_comment || null,
             JSON.stringify(metrics.textual_info || {}),
             raw, // Store raw text instead of stringified JSON
             metrics.is_workday === false ? 0 : 1
