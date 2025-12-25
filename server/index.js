@@ -48,13 +48,19 @@ app.post('/api/notes/parse', async (req, res) => {
     }
 });
 
-// Get raw AI output for a date
+// Get full data for a note (metrics + raw)
 app.get('/api/notes/:date/raw', (req, res) => {
     const { date } = req.params;
     try {
-        const row = db.prepare('SELECT raw_ai_output FROM daily_metrics WHERE date = ?').get(date);
+        const row = db.prepare('SELECT * FROM daily_metrics WHERE date = ?').get(date);
         if (!row) return res.status(404).json({ error: 'Note not found' });
-        res.json({ raw: JSON.parse(row.raw_ai_output || '{}') });
+
+        // Parse JSON fields
+        const data = {
+            ...row,
+            textual_info: JSON.parse(row.textual_info || '{}')
+        };
+        res.json(data);
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
@@ -85,21 +91,31 @@ app.get('/api/procrastination', (req, res) => {
     }
 });
 
-// Trigger extraction script
-app.post('/api/refresh', (req, res) => {
-    console.log('Refresh triggered...');
-    exec('node scripts/extract.js', (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            // We don't fail the request immediately if it's long running, but here we just wait?
-            // Usually valid to return 202 Accepted and run in background, but user might want to know when done.
-            // For simplicity, let's just log.
-        }
-        console.log(`stdout: ${stdout}`);
-        console.error(`stderr: ${stderr}`);
-    });
-    // Return immediately to not block UI
-    res.json({ message: 'Refresh started in background.' });
+// Trigger extraction for missing notes
+app.post('/api/refresh', async (req, res) => {
+    console.log('Refresh triggered via Service...');
+    try {
+        const notes = listAvailableNotes();
+        const missing = notes.filter(n => n.status === 'Missing');
+
+        // We can process them in sequence to avoid overloading Gemini
+        // or just return and let it run in background.
+        // Let's run in background but using the service.
+        (async () => {
+            for (const note of missing) {
+                try {
+                    await parseNote(note.date);
+                } catch (e) {
+                    console.error(`Failed to parse ${note.date} during sync:`, e.message);
+                }
+            }
+            console.log('Background sync complete.');
+        })();
+
+        res.json({ message: `Sync started for ${missing.length} missing notes.` });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // Serve React App for any other route

@@ -45,11 +45,14 @@ async function extractDailyMetrics(content, date) {
         const response = await result.response;
         const text = response.text();
         const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) return null;
-        return JSON.parse(jsonMatch[0]);
+
+        return {
+            data: jsonMatch ? JSON.parse(jsonMatch[0]) : null,
+            raw: text
+        };
     } catch (error) {
         console.error("Error parsing daily note:", error);
-        return null;
+        return { data: null, raw: `Error: ${error.message}` };
     }
 }
 

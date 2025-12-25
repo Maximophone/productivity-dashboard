@@ -15,9 +15,10 @@ async function parseNote(date) {
     }
 
     const content = fs.readFileSync(fullPath, 'utf-8');
-    const metrics = await extractDailyMetrics(content, date);
+    const { data: metrics, raw } = await extractDailyMetrics(content, date);
 
     if (metrics) {
+        console.log(`Extracted metrics for ${date}:`, JSON.stringify(metrics, null, 2));
         const insert = db.prepare(`
             INSERT OR REPLACE INTO daily_metrics (
                 date, start_time, work_hours, procrastination_minutes, dispersion_minutes,
@@ -40,7 +41,7 @@ async function parseNote(date) {
             metrics.mood_score ?? null,
             metrics.mood_sentiment || '',
             JSON.stringify(metrics.textual_info || {}),
-            JSON.stringify(metrics), // Store raw output
+            raw, // Store raw text instead of stringified JSON
             metrics.is_workday === false ? 0 : 1
         );
         return metrics;

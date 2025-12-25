@@ -90,7 +90,7 @@ function App() {
         try {
             const res = await fetch(`/api/notes/${date}/raw`);
             const data = await res.json();
-            setRawData(data.raw);
+            setRawData(data); // Stores the full row now
             setSelectedDate(date);
         } catch (e) {
             console.error('Error fetching raw data:', e);
@@ -251,17 +251,62 @@ function App() {
                             </table>
                         </div>
                         <div className="card" style={{ padding: '1.5rem', maxHeight: '80vh', overflowY: 'auto' }}>
-                            <h3 style={{ marginTop: 0 }}>
-                                Raw Extraction Output
-                                {selectedDate && <span style={{ color: 'var(--accent-color)', marginLeft: '10px' }}>({selectedDate})</span>}
-                            </h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>
+                                    Note Details
+                                    {selectedDate && <span style={{ color: 'var(--accent-color)', marginLeft: '10px' }}>({selectedDate})</span>}
+                                </h3>
+                                {rawData && (
+                                    <button
+                                        onClick={() => setSelectedDate(null) || setRawData(null)}
+                                        style={{ background: 'transparent', border: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '0.8rem' }}
+                                    >
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
                             {rawData ? (
-                                <pre style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', fontSize: '0.85rem', color: '#4ade80' }}>
-                                    {JSON.stringify(rawData, null, 2)}
-                                </pre>
+                                <div className="data-refinement-view" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    <section>
+                                        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Structured Metrics</h4>
+                                        <pre style={{
+                                            background: 'rgba(0,0,0,0.3)',
+                                            padding: '1rem',
+                                            borderRadius: '8px',
+                                            overflowX: 'auto',
+                                            fontSize: '0.85rem',
+                                            color: '#38bdf8', // Blue for structured
+                                            margin: 0,
+                                            border: '1px solid rgba(56, 189, 248, 0.1)'
+                                        }}>
+                                            {(() => {
+                                                const { raw_ai_output, ...metrics } = rawData;
+                                                return JSON.stringify(metrics, null, 2);
+                                            })()}
+                                        </pre>
+                                    </section>
+
+                                    <section>
+                                        <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.8rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Raw AI Output</h4>
+                                        <pre style={{
+                                            background: 'rgba(0,0,0,0.2)',
+                                            padding: '1rem',
+                                            borderRadius: '8px',
+                                            overflowX: 'auto',
+                                            fontSize: '0.85rem',
+                                            color: '#4ade80', // Green for raw
+                                            whiteSpace: 'pre-wrap',
+                                            wordBreak: 'break-word',
+                                            margin: 0,
+                                            border: '1px solid rgba(74, 222, 128, 0.1)'
+                                        }}>
+                                            {rawData.raw_ai_output}
+                                        </pre>
+                                    </section>
+                                </div>
                             ) : (
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: 'var(--text-secondary)' }}>
-                                    Select a parsed note to view extracted data
+                                    Select a parsed note to view details
                                 </div>
                             )}
                         </div>
