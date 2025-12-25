@@ -3,6 +3,7 @@ const path = require('path');
 require('dotenv').config();
 const { db, initDb } = require('../server/db');
 const { extractDailyMetrics, extractProcrastinationEvents } = require('../server/gemini');
+const { parseNote } = require('../server/services/extractionService');
 
 // Initialize DB if needed
 initDb();
@@ -32,38 +33,9 @@ async function processDailyNotes() {
         const date = file.replace('.md', '');
         if (!isFull && existing.includes(date)) continue;
 
-        console.log(`Processing ${date}...`);
-        const content = fs.readFileSync(path.join(NOTES_PATH, file), 'utf-8');
-
         try {
-            const metrics = await extractDailyMetrics(content, date);
-            if (metrics) {
-                const insert = db.prepare(`
-                    INSERT OR REPLACE INTO daily_metrics (
-                        date, start_time, work_hours, procrastination_minutes, dispersion_minutes,
-                        total_hours, mindfulness_moments, meditation_time, meditation_quality,
-                        sleep_quality, mood_score, mood_sentiment, textual_info, is_workday
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                `);
-
-                insert.run(
-                    date,
-                    metrics.start_time || null,
-                    metrics.work_hours ?? 0,
-                    metrics.procrastination_minutes ?? 0,
-                    metrics.dispersion_minutes ?? 0,
-                    metrics.total_hours ?? 0,
-                    metrics.mindfulness_moments ?? 0,
-                    metrics.meditation_time ?? null,
-                    metrics.meditation_quality ?? null,
-                    metrics.sleep_quality ?? null,
-                    metrics.mood_score ?? null,
-                    metrics.mood_sentiment || '',
-                    JSON.stringify(metrics.textual_info || {}),
-                    metrics.is_workday === false ? 0 : 1
-                );
-                console.log(`Saved metrics for ${date}`);
-            }
+            await parseNote(date);
+            console.log(`Saved metrics for ${date}`);
         } catch (e) {
             console.error(`Failed to process ${date}:`, e);
         }

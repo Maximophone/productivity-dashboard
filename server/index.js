@@ -13,7 +13,52 @@ app.use(express.json());
 // Serve static files from React app
 app.use(express.static(path.join(__dirname, '../dist')));
 
+const { parseNote, listAvailableNotes } = require('./services/extractionService');
+
 /* --- API ENDPOINTS --- */
+
+// List all notes and their status
+app.get('/api/notes', (req, res) => {
+    try {
+        const notes = listAvailableNotes();
+        res.json(notes);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Parse specific notes
+app.post('/api/notes/parse', async (req, res) => {
+    const { dates } = req.body;
+    if (!dates || !Array.isArray(dates)) {
+        return res.status(400).json({ error: 'Dates array required' });
+    }
+
+    // We run this in the background but return immediate feedback
+    // or we can wait for them all? For a few, waiting is fine.
+    try {
+        const results = [];
+        for (const date of dates) {
+            const data = await parseNote(date);
+            results.push({ date, success: !!data });
+        }
+        res.json({ message: 'Parsing complete', results });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// Get raw AI output for a date
+app.get('/api/notes/:date/raw', (req, res) => {
+    const { date } = req.params;
+    try {
+        const row = db.prepare('SELECT raw_ai_output FROM daily_metrics WHERE date = ?').get(date);
+        if (!row) return res.status(404).json({ error: 'Note not found' });
+        res.json({ raw: JSON.parse(row.raw_ai_output || '{}') });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
 
 // Get all daily metrics
 app.get('/api/metrics', (req, res) => {

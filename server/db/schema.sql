@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS daily_metrics (
   mood_score REAL,
   mood_sentiment TEXT,
   textual_info TEXT, -- Stored as JSON
+  raw_ai_output TEXT, -- Raw JSON string from AI
   is_workday BOOLEAN DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP

@@ -9,7 +9,11 @@ function App() {
     const [procrastination, setProcrastination] = useState([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [viewMode, setViewMode] = useState('daily'); // 'daily' or 'weekly'
+    const [view, setView] = useState('daily'); // 'daily', 'weekly', or 'management'
+    const [notes, setNotes] = useState([]);
+    const [parsing, setParsing] = useState(false);
+    const [rawData, setRawData] = useState(null);
+    const [selectedDate, setSelectedDate] = useState(null);
 
     const formatDuration = (decimalHours) => {
         if (decimalHours === null || decimalHours === undefined || isNaN(decimalHours)) return '-';
@@ -55,9 +59,50 @@ function App() {
         }
     };
 
+    const fetchNotes = async () => {
+        try {
+            const res = await fetch('/api/notes');
+            const data = await res.json();
+            setNotes(data);
+        } catch (e) {
+            console.error('Error fetching notes:', e);
+        }
+    };
+
+    const handleParse = async (date) => {
+        setParsing(true);
+        try {
+            await fetch('/api/notes/parse', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dates: [date] })
+            });
+            await fetchNotes();
+            await fetchData();
+        } catch (e) {
+            console.error('Error parsing note:', e);
+        } finally {
+            setParsing(false);
+        }
+    };
+
+    const fetchRaw = async (date) => {
+        try {
+            const res = await fetch(`/api/notes/${date}/raw`);
+            const data = await res.json();
+            setRawData(data.raw);
+            setSelectedDate(date);
+        } catch (e) {
+            console.error('Error fetching raw data:', e);
+        }
+    };
+
     useEffect(() => {
         fetchData();
-    }, []);
+        fetchNotes();
+        const interval = setInterval(fetchData, 60000);
+        return () => clearInterval(interval);
+    }, [view]);
 
     const getWeeklyData = (dailyData) => {
         const weeks = {};
@@ -99,7 +144,7 @@ function App() {
         }));
     };
 
-    const chartData = viewMode === 'daily' ? metrics : getWeeklyData(metrics);
+    const chartData = view === 'weekly' ? getWeeklyData(metrics) : metrics;
 
     const handleRefresh = async () => {
         setRefreshing(true);
@@ -107,6 +152,7 @@ function App() {
             await fetch('/api/refresh', { method: 'POST' });
             setTimeout(() => {
                 fetchData();
+                fetchNotes();
                 setRefreshing(false);
             }, 5000);
         } catch (e) {
@@ -123,263 +169,336 @@ function App() {
         <div className="dashboard">
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
                 <div>
-                    <h1>Productivity Dashboard</h1>
-                    <p style={{ color: 'var(--text-secondary)' }}>Tracking daily habits and focus from Obsidian</p>
+                    <h1>Productivity <span style={{ color: 'var(--accent-color)' }}>Nexus</span></h1>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Deep insights from your personal knowledge base</p>
                 </div>
-                <div style={{ display: 'flex', gap: '1rem' }}>
-                    <div className="toggle-group" style={{ background: 'rgba(255,255,255,0.05)', borderRadius: '8px', padding: '4px' }}>
+                <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                    <div className="tab-group" style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '8px' }}>
                         <button
-                            onClick={() => setViewMode('daily')}
-                            style={{
-                                background: viewMode === 'daily' ? 'var(--accent-color)' : 'transparent',
-                                color: viewMode === 'daily' ? 'white' : 'var(--text-secondary)',
-                                padding: '6px 12px'
-                            }}
+                            onClick={() => setView('daily')}
+                            style={{ padding: '6px 12px', border: 'none', background: view === 'daily' ? 'rgba(255,255,255,0.1)' : 'transparent', color: '#fff', borderRadius: '6px', cursor: 'pointer' }}
                         >Daily</button>
                         <button
-                            onClick={() => setViewMode('weekly')}
-                            style={{
-                                background: viewMode === 'weekly' ? 'var(--accent-color)' : 'transparent',
-                                color: viewMode === 'weekly' ? 'white' : 'var(--text-secondary)',
-                                padding: '6px 12px'
-                            }}
+                            onClick={() => setView('weekly')}
+                            style={{ padding: '6px 12px', border: 'none', background: view === 'weekly' ? 'rgba(255,255,255,0.1)' : 'transparent', color: '#fff', borderRadius: '6px', cursor: 'pointer' }}
                         >Weekly</button>
+                        <button
+                            onClick={() => setView('management')}
+                            style={{ padding: '6px 12px', border: 'none', background: view === 'management' ? 'rgba(255,255,255,0.1)' : 'transparent', color: '#fff', borderRadius: '6px', cursor: 'pointer' }}
+                        >Notes</button>
                     </div>
-                    <button onClick={handleRefresh} disabled={refreshing}>
-                        {refreshing ? 'Syncing...' : 'Sync Notes'}
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        className="refresh-btn"
+                        style={{ padding: '8px 16px', background: 'var(--accent-color)', color: '#000', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer' }}
+                    >
+                        {refreshing ? 'Syncing...' : 'Sync All'}
                     </button>
                 </div>
             </header>
 
-            {/* KPI Cards */}
-            <section className="grid">
-                <div className="card">
-                    <div className="stat-label">Work Hours (Last)</div>
-                    <div className="stat-value">{formatDuration(latest.work_hours)}</div>
-                    <div style={{ fontSize: '0.8rem', color: latest.work_hours >= 6 ? 'var(--success-color)' : 'var(--warning-color)' }}>
-                        Target: 6h+
+            {view === 'management' ? (
+                <div className="management-view">
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
+                        <div className="card" style={{ padding: '1.5rem', maxHeight: '80vh', overflowY: 'auto' }}>
+                            <h3 style={{ marginTop: 0 }}>Obsidian Notes</h3>
+                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <th style={{ textAlign: 'left', padding: '10px' }}>Date</th>
+                                        <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
+                                        <th style={{ textAlign: 'right', padding: '10px' }}>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {notes.map(note => (
+                                        <tr key={note.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ padding: '10px' }}>{note.date}</td>
+                                            <td style={{ padding: '10px' }}>
+                                                <span style={{
+                                                    padding: '2px 8px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.8rem',
+                                                    background: note.status === 'Parsed' ? 'rgba(74, 222, 128, 0.1)' : 'rgba(248, 113, 113, 0.1)',
+                                                    color: note.status === 'Parsed' ? '#4ade80' : '#f87171'
+                                                }}>
+                                                    {note.status}
+                                                </span>
+                                            </td>
+                                            <td style={{ padding: '10px', textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        onClick={() => handleParse(note.date)}
+                                                        disabled={parsing}
+                                                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                                                    >
+                                                        Parse
+                                                    </button>
+                                                    {note.status === 'Parsed' && (
+                                                        <button
+                                                            onClick={() => fetchRaw(note.date)}
+                                                            style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                                                        >
+                                                            Data
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div className="card" style={{ padding: '1.5rem', maxHeight: '80vh', overflowY: 'auto' }}>
+                            <h3 style={{ marginTop: 0 }}>
+                                Raw Extraction Output
+                                {selectedDate && <span style={{ color: 'var(--accent-color)', marginLeft: '10px' }}>({selectedDate})</span>}
+                            </h3>
+                            {rawData ? (
+                                <pre style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '8px', overflowX: 'auto', fontSize: '0.85rem', color: '#4ade80' }}>
+                                    {JSON.stringify(rawData, null, 2)}
+                                </pre>
+                            ) : (
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '200px', color: 'var(--text-secondary)' }}>
+                                    Select a parsed note to view extracted data
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
-                <div className="card">
-                    <div className="stat-label">Distractions (Last)</div>
-                    <div className="stat-value">
-                        {((latest.procrastination_minutes || 0) + (latest.dispersion_minutes || 0))}m
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        Procrastination: {latest.procrastination_minutes || 0}m
-                    </div>
-                </div>
-                <div className="card">
-                    <div className="stat-label">Mindfulness</div>
-                    <div className="stat-value">{latest.mindfulness_moments || 0}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        Meditation: {latest.meditation_time || 0}m
-                    </div>
-                </div>
-                <div className="card">
-                    <div className="stat-label">Mood</div>
-                    <div className="stat-value" style={{ fontSize: '1.5rem' }}>
-                        {latest.mood_sentiment || '-'}
-                    </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                        Score: {latest.mood_score || '-'}
-                    </div>
-                </div>
-            </section>
+            ) : (
+                <>
+                    <section className="grid">
+                        <div className="card">
+                            <div className="stat-label">Work Hours (Last)</div>
+                            <div className="stat-value">{formatDuration(latest.work_hours)}</div>
+                            <div style={{ fontSize: '0.8rem', color: latest.work_hours >= 6 ? 'var(--success-color)' : 'var(--warning-color)' }}>
+                                Target: 6h+
+                            </div>
+                        </div>
+                        <div className="card">
+                            <div className="stat-label">Distractions (Last)</div>
+                            <div className="stat-value">
+                                {((latest.procrastination_minutes || 0) + (latest.dispersion_minutes || 0))}m
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                Procrastination: {latest.procrastination_minutes || 0}m
+                            </div>
+                        </div>
+                        <div className="card">
+                            <div className="stat-label">Mindfulness</div>
+                            <div className="stat-value">{latest.mindfulness_moments || 0}</div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                Meditation: {latest.meditation_time || 0}m
+                            </div>
+                        </div>
+                        <div className="card">
+                            <div className="stat-label">Mood</div>
+                            <div className="stat-value" style={{ fontSize: '1.5rem' }}>
+                                {latest.mood_sentiment || '-'}
+                            </div>
+                            <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                                Score: {latest.mood_score || '-'}
+                            </div>
+                        </div>
+                    </section>
 
-            {/* Charts */}
-            <h2>Time Utilization {viewMode === 'weekly' ? '(Weekly Aggregated)' : ''}</h2>
-            <div className="card" style={{ height: '400px' }}>
-                <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                        <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
-                        <YAxis stroke="var(--text-secondary)" label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
-                        <Tooltip
-                            content={({ active, payload, label }) => {
-                                if (active && payload && payload.length) {
-                                    const data = payload[0].payload;
-                                    const info = typeof data.textual_info === 'string' ? JSON.parse(data.textual_info) : data.textual_info;
+                    {/* Charts */}
+                    <h2>Time Utilization {view === 'weekly' ? '(Weekly Aggregated)' : ''}</h2>
+                    <div className="card" style={{ height: '400px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                            <ComposedChart data={chartData}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
+                                <YAxis stroke="var(--text-secondary)" label={{ value: 'Hours', angle: -90, position: 'insideLeft' }} />
+                                <Tooltip
+                                    content={({ active, payload, label }) => {
+                                        if (active && payload && payload.length) {
+                                            const data = payload[0].payload;
+                                            const info = typeof data.textual_info === 'string' ? JSON.parse(data.textual_info) : data.textual_info;
 
-                                    return (
-                                        <div className="custom-tooltip" style={{
-                                            backgroundColor: '#1e293b',
-                                            padding: '1rem',
-                                            borderRadius: '12px',
-                                            border: '1px solid rgba(255,255,255,0.1)',
-                                            boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)',
-                                            maxWidth: '300px'
-                                        }}>
-                                            <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: '#fff' }}>{label}</p>
+                                            return (
+                                                <div className="custom-tooltip" style={{
+                                                    backgroundColor: '#1e293b',
+                                                    padding: '1rem',
+                                                    borderRadius: '12px',
+                                                    border: '1px solid rgba(255,255,255,0.1)',
+                                                    boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)',
+                                                    maxWidth: '300px'
+                                                }}>
+                                                    <p style={{ margin: '0 0 0.5rem 0', fontWeight: 'bold', color: '#fff' }}>{label}</p>
 
-                                            {/* Metrics */}
-                                            <div style={{ marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
-                                                {payload.map((entry, idx) => (
-                                                    <div key={idx} style={{ color: entry.color, fontSize: '0.9rem', marginBottom: '2px' }}>
-                                                        {entry.name}: {formatDuration(entry.value)}
+                                                    {/* Metrics */}
+                                                    <div style={{ marginBottom: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '0.5rem' }}>
+                                                        {payload.map((entry, idx) => (
+                                                            <div key={idx} style={{ color: entry.color, fontSize: '0.9rem', marginBottom: '2px' }}>
+                                                                {entry.name}: {formatDuration(entry.value)}
+                                                            </div>
+                                                        ))}
                                                     </div>
-                                                ))}
-                                            </div>
 
-                                            {/* Qualitative Context */}
-                                            {info && (
-                                                <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)' }}>
-                                                    {info.most_important_task && (
-                                                        <div style={{ marginBottom: '0.5rem' }}>
-                                                            <strong style={{ color: 'var(--accent-color)' }}>MIT:</strong> {info.most_important_task}
-                                                        </div>
-                                                    )}
-                                                    {info.summary && (
-                                                        <div style={{ marginBottom: '0.5rem', fontStyle: 'italic', borderLeft: '2px solid var(--accent-color)', paddingLeft: '8px' }}>
-                                                            {info.summary}
-                                                        </div>
-                                                    )}
-                                                    {(info.wins && info.wins.length > 0) && (
-                                                        <div style={{ marginBottom: '0.5rem' }}>
-                                                            <strong style={{ color: '#4ade80' }}>Wins:</strong> {info.wins[0]}{info.wins.length > 1 ? ` (+${info.wins.length - 1} more)` : ''}
-                                                        </div>
-                                                    )}
-                                                    {(info.blockers && info.blockers.length > 0) && (
-                                                        <div style={{ marginBottom: '0.5rem' }}>
-                                                            <strong style={{ color: '#f87171' }}>Blockers:</strong> {info.blockers[0]}
+                                                    {/* Qualitative Context */}
+                                                    {info && (
+                                                        <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)' }}>
+                                                            {info.most_important_task && (
+                                                                <div style={{ marginBottom: '0.5rem' }}>
+                                                                    <strong style={{ color: 'var(--accent-color)' }}>MIT:</strong> {info.most_important_task}
+                                                                </div>
+                                                            )}
+                                                            {info.summary && (
+                                                                <div style={{ marginBottom: '0.5rem', fontStyle: 'italic', borderLeft: '2px solid var(--accent-color)', paddingLeft: '8px' }}>
+                                                                    {info.summary}
+                                                                </div>
+                                                            )}
+                                                            {(info.wins && info.wins.length > 0) && (
+                                                                <div style={{ marginBottom: '0.5rem' }}>
+                                                                    <strong style={{ color: '#4ade80' }}>Wins:</strong> {info.wins[0]}{info.wins.length > 1 ? ` (+${info.wins.length - 1} more)` : ''}
+                                                                </div>
+                                                            )}
+                                                            {(info.blockers && info.blockers.length > 0) && (
+                                                                <div style={{ marginBottom: '0.5rem' }}>
+                                                                    <strong style={{ color: '#f87171' }}>Blockers:</strong> {info.blockers[0]}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
-                                            )}
-                                        </div>
-                                    );
-                                }
-                                return null;
-                            }}
-                        />
-                        <Legend />
-                        <Bar stackId="a" dataKey="work_hours" name="Productive" fill="#38bdf8" radius={viewMode === 'weekly' ? [0, 0, 0, 0] : [0, 0, 0, 0]} />
-                        <Bar stackId="a" dataKey="dispersion_hours" name="Dispersion" fill="#facc15" />
-                        <Bar stackId="a" dataKey="procrastination_hours" name="Procrastination" fill="#f87171" radius={[4, 4, 0, 0]} />
-                        {viewMode === 'daily' && (
-                            <Line type="monotone" dataKey="work_hours_rolling" name="7d avg (Productive)" stroke="#4ade80" strokeWidth={3} dot={false} />
-                        )}
-                    </ComposedChart>
-                </ResponsiveContainer>
-            </div>
+                                            );
+                                        }
+                                        return null;
+                                    }}
+                                />
+                                <Legend />
+                                <Bar stackId="a" dataKey="work_hours" name="Productive" fill="#38bdf8" radius={view === 'weekly' ? [0, 0, 0, 0] : [0, 0, 0, 0]} />
+                                <Bar stackId="a" dataKey="dispersion_hours" name="Dispersion" fill="#facc15" />
+                                <Bar stackId="a" dataKey="procrastination_hours" name="Procrastination" fill="#f87171" radius={[4, 4, 0, 0]} />
+                                {view === 'daily' && (
+                                    <Line type="monotone" dataKey="work_hours_rolling" name="7d avg (Productive)" stroke="#4ade80" strokeWidth={3} dot={false} />
+                                )}
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                <div>
-                    <h2>Wellbeing Trends (Stacked Lanes)</h2>
-                    <div className="card" style={{ height: '500px', display: 'flex', flexDirection: 'column', gap: '0', padding: '1rem 0' }}>
-                        {/* Mood Lane */}
-                        <div style={{ height: '33.3%', position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: '0', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MOOD</div>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="date" hide />
-                                    <YAxis domain={[0, 10]} hide />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                    <Bar dataKey="mood_score" name="Mood" fill="#c084fc" radius={[2, 2, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                        <div>
+                            <h2>Wellbeing Trends (Stacked Lanes)</h2>
+                            <div className="card" style={{ height: '500px', display: 'flex', flexDirection: 'column', gap: '0', padding: '1rem 0' }}>
+                                {/* Mood Lane */}
+                                <div style={{ height: '33.3%', position: 'relative' }}>
+                                    <div style={{ position: 'absolute', top: '0', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MOOD</div>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                            <XAxis dataKey="date" hide />
+                                            <YAxis domain={[0, 10]} hide />
+                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                            <Bar dataKey="mood_score" name="Mood" fill="#c084fc" radius={[2, 2, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                {/* Sleep Lane */}
+                                <div style={{ height: '33.3%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>SLEEP</div>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                            <XAxis dataKey="date" hide />
+                                            <YAxis domain={[0, 10]} hide />
+                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                            <Bar dataKey="sleep_quality" name="Sleep" fill="#818cf8" radius={[2, 2, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                {/* Meditation Lane */}
+                                <div style={{ height: '33.3%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MEDITATION QUALITY</div>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                            <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 9 }} />
+                                            <YAxis domain={[0, 5]} hide />
+                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                            <Bar dataKey="meditation_quality" name="Meditation Quality" fill="#4ade80" radius={[2, 2, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         </div>
-                        {/* Sleep Lane */}
-                        <div style={{ height: '33.3%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>SLEEP</div>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="date" hide />
-                                    <YAxis domain={[0, 10]} hide />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                    <Bar dataKey="sleep_quality" name="Sleep" fill="#818cf8" radius={[2, 2, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                        {/* Meditation Lane */}
-                        <div style={{ height: '33.3%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MEDITATION QUALITY</div>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 9 }} />
-                                    <YAxis domain={[0, 5]} hide />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                    <Bar dataKey="meditation_quality" name="Meditation Quality" fill="#4ade80" radius={[2, 2, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
+                        <div>
+                            <h2>Mindfulness & Meditation (Stacked Lanes)</h2>
+                            <div className="card" style={{ height: '350px', display: 'flex', flexDirection: 'column', gap: '0', padding: '1rem 0' }}>
+                                {/* Moments Lane */}
+                                <div style={{ height: '50%', position: 'relative' }}>
+                                    <div style={{ position: 'absolute', top: '0', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MOMENTS LOGGED</div>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                            <XAxis dataKey="date" hide />
+                                            <YAxis hide />
+                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                            <Bar dataKey="mindfulness_moments" name="Moments" fill="#2dd4bf" radius={[2, 2, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                                {/* Meditation Minutes Lane */}
+                                <div style={{ height: '50%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MEDITATION (MINUTES)</div>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                            <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 9 }} />
+                                            <YAxis hide />
+                                            <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
+                                            <Bar dataKey="meditation_time" name="Minutes" fill="#0d9488" radius={[2, 2, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
-                <div>
-                    <h2>Mindfulness & Meditation (Stacked Lanes)</h2>
-                    <div className="card" style={{ height: '350px', display: 'flex', flexDirection: 'column', gap: '0', padding: '1rem 0' }}>
-                        {/* Moments Lane */}
-                        <div style={{ height: '50%', position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: '0', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MOMENTS LOGGED</div>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="date" hide />
-                                    <YAxis hide />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                    <Bar dataKey="mindfulness_moments" name="Moments" fill="#2dd4bf" radius={[2, 2, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                        {/* Meditation Minutes Lane */}
-                        <div style={{ height: '50%', position: 'relative', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div style={{ position: 'absolute', top: '5px', left: '10px', fontSize: '0.7rem', color: 'var(--text-secondary)', zIndex: 1 }}>MEDITATION (MINUTES)</div>
-                            <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={chartData} syncId="wellbeing" margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                                    <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 9 }} />
-                                    <YAxis hide />
-                                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none' }} />
-                                    <Bar dataKey="meditation_time" name="Minutes" fill="#0d9488" radius={[2, 2, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <h2>Recent Procrastination Events</h2>
-            <div className="card" style={{ overflowX: 'auto' }}>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Time</th>
-                            <th>Type</th>
-                            <th>Duration</th>
-                            <th>Activity</th>
-                            <th>Trigger</th>
-                            <th>Feeling</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {procrastination.slice(0, 10).map((event, i) => (
-                            <tr key={i}>
-                                <td>{event.date}</td>
-                                <td>{event.time}</td>
-                                <td>
-                                    <span style={{
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
-                                        fontSize: '0.8rem',
-                                        backgroundColor: event.type === 'Procrastination' ? 'rgba(248, 113, 113, 0.2)' : 'rgba(250, 204, 21, 0.2)',
-                                        color: event.type === 'Procrastination' ? '#fca5a5' : '#fde047'
-                                    }}>
-                                        {event.type}
-                                    </span>
-                                </td>
-                                <td>{event.duration_minutes}m</td>
-                                <td>{event.activity}</td>
-                                <td>{event.trigger}</td>
-                                <td>{event.feeling}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+                    <h2>Recent Procrastination Events</h2>
+                    <div className="card" style={{ overflowX: 'auto' }}>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Time</th>
+                                    <th>Type</th>
+                                    <th>Duration</th>
+                                    <th>Activity</th>
+                                    <th>Trigger</th>
+                                    <th>Feeling</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {procrastination.slice(0, 10).map((event, i) => (
+                                    <tr key={i}>
+                                        <td>{event.date}</td>
+                                        <td>{event.time}</td>
+                                        <td>
+                                            <span style={{
+                                                padding: '2px 8px',
+                                                borderRadius: '4px',
+                                                fontSize: '0.8rem',
+                                                backgroundColor: event.type === 'Procrastination' ? 'rgba(248, 113, 113, 0.2)' : 'rgba(250, 204, 21, 0.2)',
+                                                color: event.type === 'Procrastination' ? '#fca5a5' : '#fde047'
+                                            }}>
+                                                {event.type}
+                                            </span>
+                                        </td>
+                                        <td>{event.duration_minutes}m</td>
+                                        <td>{event.activity}</td>
+                                        <td>{event.trigger}</td>
+                                        <td>{event.feeling}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
