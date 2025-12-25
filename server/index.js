@@ -66,6 +66,26 @@ app.get('/api/notes/:date/raw', (req, res) => {
     }
 });
 
+// Delete parsed data for notes
+app.delete('/api/notes', (req, res) => {
+    const { dates } = req.body;
+    if (!dates || !Array.isArray(dates) || dates.length === 0) {
+        return res.status(400).json({ error: 'Dates array required' });
+    }
+
+    try {
+        const deleteStmt = db.prepare('DELETE FROM daily_metrics WHERE date = ?');
+        let deleted = 0;
+        for (const date of dates) {
+            const result = deleteStmt.run(date);
+            deleted += result.changes;
+        }
+        res.json({ message: `Deleted ${deleted} note(s)`, deleted });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Get all daily metrics
 app.get('/api/metrics', (req, res) => {
     try {

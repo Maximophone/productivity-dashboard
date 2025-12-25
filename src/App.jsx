@@ -14,6 +14,8 @@ function App() {
     const [parsing, setParsing] = useState(false);
     const [rawData, setRawData] = useState(null);
     const [selectedDate, setSelectedDate] = useState(null);
+    const [selectedNotes, setSelectedNotes] = useState([]);
+    const [parsingProgress, setParsingProgress] = useState(null); // { total, completed, current }
 
     const formatDuration = (decimalHours) => {
         if (decimalHours === null || decimalHours === undefined || isNaN(decimalHours)) return '-';
@@ -71,6 +73,7 @@ function App() {
 
     const handleParse = async (date) => {
         setParsing(true);
+        setParsingProgress({ total: 1, completed: 0, current: date });
         try {
             await fetch('/api/notes/parse', {
                 method: 'POST',
@@ -83,6 +86,94 @@ function App() {
             console.error('Error parsing note:', e);
         } finally {
             setParsing(false);
+            setParsingProgress(null);
+        }
+    };
+
+    const handleParseSelected = async () => {
+        if (selectedNotes.length === 0) return;
+        setParsing(true);
+        setParsingProgress({ total: selectedNotes.length, completed: 0, current: null });
+
+        for (let i = 0; i < selectedNotes.length; i++) {
+            const date = selectedNotes[i];
+            setParsingProgress({ total: selectedNotes.length, completed: i, current: date });
+            try {
+                await fetch('/api/notes/parse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dates: [date] })
+                });
+            } catch (e) {
+                console.error(`Error parsing ${date}:`, e);
+            }
+        }
+
+        setParsingProgress({ total: selectedNotes.length, completed: selectedNotes.length, current: null });
+        await fetchNotes();
+        await fetchData();
+        setSelectedNotes([]);
+        setParsing(false);
+        setParsingProgress(null);
+    };
+
+    const toggleNoteSelection = (date) => {
+        setSelectedNotes(prev =>
+            prev.includes(date)
+                ? prev.filter(d => d !== date)
+                : [...prev, date]
+        );
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedNotes.length === notes.length) {
+            setSelectedNotes([]);
+        } else {
+            setSelectedNotes(notes.map(n => n.date));
+        }
+    };
+
+    const handleDelete = async (date) => {
+        if (!confirm(`Are you sure you want to delete parsed data for ${date}?`)) return;
+        try {
+            await fetch('/api/notes', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dates: [date] })
+            });
+            await fetchNotes();
+            await fetchData();
+            if (selectedDate === date) {
+                setSelectedDate(null);
+                setRawData(null);
+            }
+        } catch (e) {
+            console.error('Error deleting note:', e);
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        const parsedSelected = selectedNotes.filter(date =>
+            notes.find(n => n.date === date)?.status === 'Parsed'
+        );
+        if (parsedSelected.length === 0) return;
+        if (!confirm(`Are you sure you want to delete parsed data for ${parsedSelected.length} note(s)?`)) return;
+
+        try {
+            await fetch('/api/notes', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ dates: parsedSelected })
+            });
+            await fetchNotes();
+            await fetchData();
+            setSelectedNotes([]);
+            if (parsedSelected.includes(selectedDate)) {
+                setSelectedDate(null);
+                setRawData(null);
+            }
+        } catch (e) {
+            console.error('Error deleting notes:', e);
         }
     };
 
@@ -202,10 +293,91 @@ function App() {
                 <div className="management-view">
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '2rem' }}>
                         <div className="card" style={{ padding: '1.5rem', maxHeight: '80vh', overflowY: 'auto' }}>
-                            <h3 style={{ marginTop: 0 }}>Obsidian Notes</h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                <h3 style={{ margin: 0 }}>Obsidian Notes</h3>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button
+                                        onClick={toggleSelectAll}
+                                        disabled={parsing}
+                                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '4px 10px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                                    >
+                                        {selectedNotes.length === notes.length ? 'Deselect All' : 'Select All'}
+                                    </button>
+                                    <button
+                                        onClick={handleParseSelected}
+                                        disabled={parsing || selectedNotes.length === 0}
+                                        style={{
+                                            background: selectedNotes.length > 0 ? 'var(--accent-color)' : 'rgba(255,255,255,0.1)',
+                                            border: 'none',
+                                            color: selectedNotes.length > 0 ? '#000' : '#666',
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            cursor: selectedNotes.length > 0 ? 'pointer' : 'not-allowed',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        Parse ({selectedNotes.length})
+                                    </button>
+                                    <button
+                                        onClick={handleDeleteSelected}
+                                        disabled={parsing || selectedNotes.filter(d => notes.find(n => n.date === d)?.status === 'Parsed').length === 0}
+                                        style={{
+                                            background: 'transparent',
+                                            border: '1px solid rgba(248, 113, 113, 0.5)',
+                                            color: '#f87171',
+                                            padding: '6px 12px',
+                                            borderRadius: '4px',
+                                            cursor: selectedNotes.filter(d => notes.find(n => n.date === d)?.status === 'Parsed').length > 0 ? 'pointer' : 'not-allowed',
+                                            fontSize: '0.8rem',
+                                            opacity: selectedNotes.filter(d => notes.find(n => n.date === d)?.status === 'Parsed').length > 0 ? 1 : 0.5
+                                        }}
+                                    >
+                                        Delete ({selectedNotes.filter(d => notes.find(n => n.date === d)?.status === 'Parsed').length})
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Progress Tracker */}
+                            {parsingProgress && (
+                                <div style={{
+                                    marginBottom: '1rem',
+                                    padding: '12px 16px',
+                                    background: 'rgba(56, 189, 248, 0.1)',
+                                    borderRadius: '8px',
+                                    border: '1px solid rgba(56, 189, 248, 0.2)'
+                                }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <span style={{ color: '#38bdf8', fontWeight: '500' }}>
+                                            Parsing {parsingProgress.completed}/{parsingProgress.total}
+                                        </span>
+                                        {parsingProgress.current && (
+                                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                                                Current: {parsingProgress.current}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div style={{
+                                        height: '6px',
+                                        background: 'rgba(255,255,255,0.1)',
+                                        borderRadius: '3px',
+                                        overflow: 'hidden'
+                                    }}>
+                                        <div style={{
+                                            height: '100%',
+                                            width: `${(parsingProgress.completed / parsingProgress.total) * 100}%`,
+                                            background: '#38bdf8',
+                                            borderRadius: '3px',
+                                            transition: 'width 0.3s ease'
+                                        }} />
+                                    </div>
+                                </div>
+                            )}
+
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                                 <thead>
                                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                                        <th style={{ width: '40px', textAlign: 'center', padding: '10px' }}></th>
                                         <th style={{ textAlign: 'left', padding: '10px' }}>Date</th>
                                         <th style={{ textAlign: 'left', padding: '10px' }}>Status</th>
                                         <th style={{ textAlign: 'right', padding: '10px' }}>Action</th>
@@ -214,6 +386,15 @@ function App() {
                                 <tbody>
                                     {notes.map(note => (
                                         <tr key={note.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <td style={{ textAlign: 'center', padding: '10px' }}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedNotes.includes(note.date)}
+                                                    onChange={() => toggleNoteSelection(note.date)}
+                                                    disabled={parsing}
+                                                    style={{ cursor: parsing ? 'not-allowed' : 'pointer' }}
+                                                />
+                                            </td>
                                             <td style={{ padding: '10px' }}>{note.date}</td>
                                             <td style={{ padding: '10px' }}>
                                                 <span style={{
@@ -231,7 +412,7 @@ function App() {
                                                     <button
                                                         onClick={() => handleParse(note.date)}
                                                         disabled={parsing}
-                                                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+                                                        style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '4px 8px', borderRadius: '4px', cursor: parsing ? 'not-allowed' : 'pointer', fontSize: '0.8rem' }}
                                                     >
                                                         Parse
                                                     </button>
