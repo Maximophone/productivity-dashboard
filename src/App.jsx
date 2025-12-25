@@ -16,6 +16,7 @@ function App() {
     const [selectedDate, setSelectedDate] = useState(null);
     const [selectedNotes, setSelectedNotes] = useState([]);
     const [parsingProgress, setParsingProgress] = useState(null); // { total, completed, current }
+    const [lastClickedIndex, setLastClickedIndex] = useState(null); // For shift-click range selection
 
     const formatDuration = (decimalHours) => {
         if (decimalHours === null || decimalHours === undefined || isNaN(decimalHours)) return '-';
@@ -117,12 +118,36 @@ function App() {
         setParsingProgress(null);
     };
 
-    const toggleNoteSelection = (date) => {
-        setSelectedNotes(prev =>
-            prev.includes(date)
-                ? prev.filter(d => d !== date)
-                : [...prev, date]
-        );
+    const handleNoteClick = (date, index, event) => {
+        if (event.shiftKey && lastClickedIndex !== null) {
+            // Shift-click: select range
+            const start = Math.min(lastClickedIndex, index);
+            const end = Math.max(lastClickedIndex, index);
+            const rangeNotes = notes.slice(start, end + 1).map(n => n.date);
+
+            // Add range to selection (union)
+            setSelectedNotes(prev => {
+                const newSelection = new Set(prev);
+                rangeNotes.forEach(d => newSelection.add(d));
+                return [...newSelection];
+            });
+        } else if (event.metaKey || event.ctrlKey) {
+            // Cmd/Ctrl-click: toggle individual
+            setSelectedNotes(prev =>
+                prev.includes(date)
+                    ? prev.filter(d => d !== date)
+                    : [...prev, date]
+            );
+            setLastClickedIndex(index);
+        } else {
+            // Regular click: toggle individual and reset anchor
+            setSelectedNotes(prev =>
+                prev.includes(date)
+                    ? prev.filter(d => d !== date)
+                    : [...prev, date]
+            );
+            setLastClickedIndex(index);
+        }
     };
 
     const toggleSelectAll = () => {
@@ -384,13 +409,14 @@ function App() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {notes.map(note => (
+                                    {notes.map((note, index) => (
                                         <tr key={note.date} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                                             <td style={{ textAlign: 'center', padding: '10px' }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={selectedNotes.includes(note.date)}
-                                                    onChange={() => toggleNoteSelection(note.date)}
+                                                    onClick={(e) => handleNoteClick(note.date, index, e)}
+                                                    onChange={() => { }} // Controlled by onClick
                                                     disabled={parsing}
                                                     style={{ cursor: parsing ? 'not-allowed' : 'pointer' }}
                                                 />
